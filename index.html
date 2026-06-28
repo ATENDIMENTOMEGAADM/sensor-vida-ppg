@@ -1,0 +1,115 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<title>PPG de contato — batimento pelo celular</title>
+<style>
+  :root { color-scheme: dark; }
+  body { margin:0; font-family: system-ui, sans-serif; background:#0d1117; color:#e6edf3;
+         display:flex; flex-direction:column; align-items:center; gap:14px; padding:18px; }
+  h1 { font-size:18px; font-weight:500; margin:6px 0; text-align:center; }
+  #bpm { font-size:64px; font-weight:600; line-height:1; }
+  #bpm small { font-size:18px; color:#8b949e; font-weight:400; }
+  #status { color:#8b949e; font-size:14px; text-align:center; min-height:20px; }
+  button { background:#238636; color:#fff; border:0; border-radius:8px; padding:14px 22px;
+           font-size:16px; }
+  button:disabled { background:#30363d; color:#8b949e; }
+  canvas { display:none; }
+  #wave { width:100%; max-width:360px; height:60px; background:#161b22; border-radius:8px; }
+  .dica { font-size:13px; color:#8b949e; max-width:360px; text-align:center; line-height:1.5; }
+  .conf-alta { color:#3fb950; } .conf-baixa { color:#d29922; }
+</style>
+</head>
+<body>
+  <h1>🫀 Batimento pelo celular (PPG de contato)</h1>
+  <div id="bpm">--<small> BPM</small></div>
+  <div id="status">Toque em iniciar e cubra a câmera traseira + flash com a ponta do dedo.</div>
+  <canvas id="wave" width="360" height="60"></canvas>
+  <button id="btn">Iniciar</button>
+  <p class="dica">Cobre <b>delicadamente</b> a lente da câmera <b>traseira</b> (e o flash) com a
+     ponta do dedo. Fique parado ~15s. A cada batimento o sangue muda a luz que atravessa o dedo —
+     o gráfico deve pulsar. Use como <b>padrão-ouro</b> pra validar o rppg.py.</p>
+  <canvas id="cv" width="64" height="64"></canvas>
+
+<script>
+const $ = id => document.getElementById(id);
+const cv = $('cv'), ctx = cv.getContext('2d', {willReadFrequently:true});
+const wave = $('wave'), wctx = wave.getContext('2d');
+let video, track, raf, buf = [];   // buf: {t, r}
+const WIN_MS = 15000;              // janela de 15s
+
+async function iniciar(){
+  $('btn').disabled = true; $('status').textContent = 'Abrindo câmera...';
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia(
+      { video: { facingMode: { ideal: 'environment' } }, audio: false });
+    video = document.createElement('video');
+    video.srcObject = stream; video.playsInline = true; await video.play();
+    track = stream.getVideoTracks()[0];
+    try { await track.applyConstraints({ advanced: [{ torch: true }] }); } catch(e){}
+    $('status').textContent = 'Cubra a câmera + flash com o dedo. Medindo...';
+    loop();
+  } catch (e) {
+    $('status').innerHTML = 'Não consegui acessar a câmera.<br>' +
+      'A câmera só funciona em <b>HTTPS</b> (ou via GitHub Pages). Veja o README.';
+    $('btn').disabled = false;
+  }
+}
+
+function loop(){
+  if (video && video.readyState >= 2){
+    ctx.drawImage(video, 0, 0, 64, 64);          // centro reduzido
+    const d = ctx.getImageData(20, 20, 24, 24).data;
+    let r = 0, n = 0;
+    for (let i = 0; i < d.length; i += 4){ r += d[i]; n++; }  // canal VERMELHO
+    const t = performance.now();
+    buf.push({ t, r: r / n });
+    while (buf.length && t - buf[0].t > WIN_MS) buf.shift();
+    desenhar();
+    if (buf.length > 90) calcular();
+  }
+  raf = requestAnimationFrame(loop);
+}
+
+function desenhar(){
+  wctx.clearRect(0,0,wave.width,wave.height);
+  if (buf.length < 4) return;
+  const rs = buf.map(b => b.r);
+  const mn = Math.min(...rs), mx = Math.max(...rs), rng = (mx-mn)||1;
+  wctx.strokeStyle = '#3fb950'; wctx.lineWidth = 2; wctx.beginPath();
+  buf.forEach((b,i) => {
+    const x = i/(buf.length-1)*wave.width;
+    const y = wave.height - ((b.r-mn)/rng)*(wave.height-6) - 3;
+    i ? wctx.lineTo(x,y) : wctx.moveTo(x,y);
+  });
+  wctx.stroke();
+}
+
+function calcular(){
+  const n = buf.length, t0 = buf[0].t;
+  const ts = buf.map(b => (b.t - t0)/1000);          // segundos (tempo REAL, nao-uniforme)
+  const mean = buf.reduce((a,b)=>a+b.r,0)/n;
+  const x = buf.map(b => b.r - mean);
+  // periodograma direto na banda 0.7-4 Hz (DFT so nas frequencias candidatas)
+  let bestF = 0, bestP = -1, soma = 0, cont = 0;
+  for (let f = 0.7; f <= 4.0; f += 0.02){
+    let re = 0, im = 0;
+    for (let k = 0; k < n; k++){ const a = 2*Math.PI*f*ts[k]; re += x[k]*Math.cos(a); im -= x[k]*Math.sin(a); }
+    const p = re*re + im*im; soma += p; cont++;
+    if (p > bestP){ bestP = p; bestF = f; }
+  }
+  const bpm = Math.round(bestF * 60);
+  const snr = bestP / (soma/cont + 1e-9);            // pico / media = qualidade
+  const dur = ts[n-1];
+  const ok = snr > 4 && bpm >= 45 && bpm <= 180 && dur > 8;
+  $('bpm').innerHTML = bpm + '<small> BPM</small>';
+  $('status').innerHTML = ok
+    ? '<span class="conf-alta">CONFIABILIDADE: ALTA</span> · valide o rppg.py contra este número'
+    : '<span class="conf-baixa">CONFIABILIDADE: BAIXA</span> · cubra melhor a lente + flash, fique parado';
+}
+
+$('btn').addEventListener('click', iniciar);
+</script>
+</body>
+</html>
