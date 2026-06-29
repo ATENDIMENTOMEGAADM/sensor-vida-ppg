@@ -2,159 +2,312 @@
 <html lang="pt-BR">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
-<title>PPG de contato — batimento pelo celular</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Égua.ai Saúde — análise de sinais vitais</title>
 <style>
-  :root { color-scheme: dark; }
-  body { margin:0; font-family: system-ui, sans-serif; background:#0d1117; color:#e6edf3;
-         display:flex; flex-direction:column; align-items:center; gap:12px; padding:16px; }
-  h1 { font-size:17px; font-weight:500; margin:4px 0; text-align:center; }
-  #bpm { font-size:60px; font-weight:600; line-height:1; }
-  #bpm small { font-size:16px; color:#8b949e; font-weight:400; }
-  #status { font-size:14px; text-align:center; min-height:38px; max-width:360px; line-height:1.4; }
-  button { background:#238636; color:#fff; border:0; border-radius:8px; padding:13px 22px; font-size:16px; }
-  button:disabled { background:#30363d; color:#8b949e; }
-  select { background:#161b22; color:#e6edf3; border:1px solid #30363d; border-radius:8px;
-           padding:9px; font-size:14px; max-width:340px; width:100%; }
-  #preview { width:96px; height:96px; border-radius:10px; object-fit:cover; background:#161b22;
-             border:2px solid #30363d; }
-  .badges { display:flex; gap:8px; flex-wrap:wrap; justify-content:center; }
-  .badge { font-size:13px; padding:6px 10px; border-radius:999px; background:#161b22; border:1px solid #30363d; }
-  .badge.ok { background:#0f2e1a; border-color:#238636; color:#3fb950; }
-  .ok { color:#3fb950; } .alerta { color:#d29922; }
-  #wave { width:100%; max-width:360px; height:54px; background:#161b22; border-radius:8px; }
-  .dica { font-size:12.5px; color:#8b949e; max-width:360px; text-align:center; line-height:1.5; }
-  canvas#cv { display:none; }
+  :root{
+    --verde:#138a5e; --verde-esc:#0c5e40; --teal:#0fb39a; --tinta:#13241d;
+    --cinza:#5b6b64; --linha:#e4ece8; --bg:#f4f8f6; --card:#ffffff;
+    --ok:#138a5e; --aten:#c9851f; --alto:#c0392b; --sombra:0 10px 30px rgba(12,60,40,.08);
+  }
+  *{box-sizing:border-box}
+  body{margin:0;font-family:'Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(--tinta)}
+  .topo{background:linear-gradient(135deg,var(--verde-esc),var(--verde));color:#fff;padding:20px 22px;
+        display:flex;align-items:center;gap:14px}
+  .topo h1{font-size:19px;margin:0;font-weight:600;letter-spacing:.2px}
+  .topo p{margin:2px 0 0;font-size:13px;opacity:.85}
+  .wrap{max-width:820px;margin:0 auto;padding:20px 16px 60px}
+  .grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+  @media(max-width:640px){.grid{grid-template-columns:1fr}}
+  .card{background:var(--card);border:1px solid var(--linha);border-radius:16px;padding:18px;box-shadow:var(--sombra)}
+  .card h2{margin:0 0 4px;font-size:16px;display:flex;align-items:center;gap:8px}
+  .card .sub{color:var(--cinza);font-size:12.5px;margin:0 0 14px}
+  .valor{font-size:54px;font-weight:700;line-height:1;color:var(--verde-esc)}
+  .valor small{font-size:16px;color:var(--cinza);font-weight:500}
+  .badges{display:flex;gap:6px;flex-wrap:wrap;margin:10px 0}
+  .b{font-size:11.5px;padding:5px 9px;border-radius:999px;background:#eef4f1;color:var(--cinza);border:1px solid var(--linha)}
+  .b.ok{background:#e7f5ee;color:var(--ok);border-color:#bce6d2}
+  .b.aten{background:#fdf3e1;color:var(--aten);border-color:#f3dcb0}
+  button{background:var(--verde);color:#fff;border:0;border-radius:10px;padding:12px 16px;font-size:14.5px;
+         font-weight:600;cursor:pointer;width:100%}
+  button.sec{background:#fff;color:var(--verde);border:1.5px solid var(--verde)}
+  button:disabled{opacity:.5;cursor:default}
+  select{width:100%;padding:9px;border:1px solid var(--linha);border-radius:9px;margin-top:8px;font-size:13px;display:none}
+  #prev{width:74px;height:74px;border-radius:12px;object-fit:cover;background:#eef4f1;border:2px solid var(--linha)}
+  canvas.wave{width:100%;height:46px;background:#f0f6f3;border-radius:9px;margin-top:8px}
+  .status{font-size:12.5px;color:var(--cinza);min-height:30px;margin-top:8px}
+  .barra{height:8px;background:#eef4f1;border-radius:9px;overflow:hidden;margin-top:8px}
+  .barra > i{display:block;height:100%;width:0;background:var(--teal);transition:width .2s}
+  .acao{margin-top:18px;display:flex;gap:12px}
+  /* ====== RELATORIO (Visual Law) ====== */
+  #relatorio{display:none;margin-top:26px}
+  .rel{background:#fff;border:1px solid var(--linha);border-radius:16px;overflow:hidden;box-shadow:var(--sombra)}
+  .rel-topo{background:linear-gradient(135deg,var(--verde-esc),var(--verde));color:#fff;padding:22px 26px;
+            display:flex;justify-content:space-between;align-items:flex-start;gap:14px}
+  .rel-topo .t{font-family:Georgia,serif;font-size:22px;font-weight:600;margin:0}
+  .rel-topo .meta{font-size:12px;opacity:.9;text-align:right;line-height:1.6}
+  .rel-corpo{padding:24px 26px}
+  .rel-sec-tit{font-family:Georgia,serif;font-size:14px;color:var(--verde-esc);text-transform:uppercase;
+               letter-spacing:1px;border-bottom:2px solid var(--linha);padding-bottom:6px;margin:6px 0 14px}
+  .vitais{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+  @media(max-width:600px){.vitais{grid-template-columns:1fr}}
+  .vital{border:1px solid var(--linha);border-radius:14px;padding:16px;position:relative;overflow:hidden}
+  .vital::before{content:"";position:absolute;left:0;top:0;bottom:0;width:5px;background:var(--verde)}
+  .vital.aten::before{background:var(--aten)} .vital.alto::before{background:var(--alto)}
+  .vital .nome{font-size:12.5px;color:var(--cinza);display:flex;align-items:center;gap:6px}
+  .vital .n{font-size:40px;font-weight:700;color:var(--tinta);line-height:1.1}
+  .vital .n small{font-size:14px;color:var(--cinza)}
+  .pill{display:inline-block;font-size:11.5px;font-weight:600;padding:3px 10px;border-radius:999px;margin-top:4px}
+  .pill.ok{background:#e7f5ee;color:var(--ok)} .pill.aten{background:#fdf3e1;color:var(--aten)}
+  .pill.alto{background:#fbeae8;color:var(--alto)}
+  .ref{font-size:11.5px;color:var(--cinza);margin-top:6px}
+  .metodo,.aviso{font-size:12.5px;line-height:1.7;color:#3a4a43;background:#f4f8f6;border-radius:12px;padding:14px 16px;margin-top:14px}
+  .aviso{background:#fdf6ea;border:1px solid #f3dcb0;color:#7a5a1a}
+  .rel-rod{border-top:1px solid var(--linha);padding:16px 26px;display:flex;justify-content:space-between;
+           align-items:center;font-size:11.5px;color:var(--cinza)}
+  .qr{font-family:monospace;font-size:10px}
+  @media print{
+    body{background:#fff} .topo,.medir,.acao,button,select,#prev,.status,.barra{display:none!important}
+    .wrap{max-width:100%;padding:0} #relatorio{display:block!important;margin:0} .rel{border:0;box-shadow:none}
+  }
 </style>
 </head>
 <body>
-  <h1>🫀 Batimento pelo celular (PPG de contato)</h1>
-  <video id="preview" playsinline muted></video>
-  <div id="bpm">--<small> BPM</small></div>
-  <div class="badges">
-    <span id="flash" class="badge">🔦 flash</span>
-    <span id="dedo"  class="badge">👆 dedo</span>
-    <span id="pulso" class="badge">💓 pulso</span>
+  <div class="topo">
+    <!-- LOGO Égua.ai Saúde (folha + linha de pulso) -->
+    <svg width="44" height="44" viewBox="0 0 64 64" aria-label="Égua.ai Saúde">
+      <circle cx="32" cy="32" r="30" fill="rgba(255,255,255,.14)"/>
+      <path d="M20 40c0-12 9-22 24-24-2 13-10 23-24 24z" fill="#bff3df"/>
+      <path d="M22 38c6-1 13-7 16-16" stroke="#0c5e40" stroke-width="2" fill="none" stroke-linecap="round"/>
+      <path d="M10 33h9l3-7 5 14 4-9 3 4h11" stroke="#fff" stroke-width="3" fill="none"
+            stroke-linecap="round" stroke-linejoin="round"/>
+    </svg>
+    <div>
+      <h1>Égua.ai <span style="opacity:.85;font-weight:400">Saúde</span></h1>
+      <p>Análise de sinais vitais sem contato · 100% brasileira 🌿</p>
+    </div>
   </div>
-  <select id="cams" style="display:none"></select>
-  <canvas id="wave" width="360" height="54"></canvas>
-  <div id="status">Toque em iniciar. Depois cubra a câmera traseira + flash com a ponta do dedo.</div>
-  <button id="btn">Iniciar</button>
-  <p class="dica">Seu celular tem várias câmeras traseiras. Se não acender o flash ou o "dedo" não
-     ficar verde, <b>troque a câmera no seletor</b> até aparecer <b>👆 dedo ✓</b> e <b>💓 pulso ✓</b> —
-     essa é a câmera certa. Use o número como <b>padrão-ouro</b> pra validar o rppg.py.</p>
-  <canvas id="cv" width="64" height="64"></canvas>
+
+  <div class="wrap">
+    <div class="grid medir">
+      <!-- BATIMENTO -->
+      <div class="card">
+        <h2>🫀 Batimento cardíaco</h2>
+        <p class="sub">Câmera + dedo (no celular, com flash) — fotopletismografia.</p>
+        <div style="display:flex;gap:12px;align-items:center">
+          <video id="prev" playsinline muted></video>
+          <div><div class="valor"><span id="bpm">--</span><small> BPM</small></div></div>
+        </div>
+        <div class="badges">
+          <span id="bflash" class="b">🔦 flash</span>
+          <span id="bdedo" class="b">👆 dedo</span>
+          <span id="bpulso" class="b">💓 pulso</span>
+        </div>
+        <select id="cams"></select>
+        <canvas id="wbpm" class="wave" width="380" height="46"></canvas>
+        <div class="status" id="sbpm">Cubra a câmera traseira + flash com o dedo.</div>
+        <button id="btnBpm">Medir batimento (20s)</button>
+      </div>
+
+      <!-- RESPIRACAO -->
+      <div class="card">
+        <h2>🫁 Respiração</h2>
+        <p class="sub">Microfone — funciona no PC e no celular. Respire perto do mic.</p>
+        <div class="valor"><span id="rpm">--</span><small> resp/min</small></div>
+        <div class="badges"><span id="brnivel" class="b">🎙️ áudio</span><span id="brconf" class="b">✓ confiança</span></div>
+        <div class="barra"><i id="rbar"></i></div>
+        <div class="status" id="srpm">Ambiente silencioso, respiração audível perto do mic.</div>
+        <button id="btnResp">Medir respiração (30s)</button>
+      </div>
+    </div>
+
+    <div class="acao">
+      <button class="sec" id="btnRel">📄 Gerar relatório de análise</button>
+    </div>
+
+    <!-- ====== RELATORIO VISUAL LAW ====== -->
+    <div id="relatorio">
+      <div class="rel">
+        <div class="rel-topo">
+          <div style="display:flex;gap:12px;align-items:center">
+            <svg width="40" height="40" viewBox="0 0 64 64">
+              <circle cx="32" cy="32" r="30" fill="rgba(255,255,255,.16)"/>
+              <path d="M20 40c0-12 9-22 24-24-2 13-10 23-24 24z" fill="#bff3df"/>
+              <path d="M10 33h9l3-7 5 14 4-9 3 4h11" stroke="#fff" stroke-width="3" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+            <div><div class="t">Relatório de Sinais Vitais</div>
+            <div style="font-size:12px;opacity:.9">Égua.ai Saúde · análise não-invasiva</div></div>
+          </div>
+          <div class="meta" id="relMeta"></div>
+        </div>
+        <div class="rel-corpo">
+          <div class="rel-sec-tit">Medições</div>
+          <div class="vitais" id="relVitais"></div>
+
+          <div class="rel-sec-tit" style="margin-top:22px">Metodologia</div>
+          <div class="metodo">
+            <b>Batimento</b> medido por <b>fotopletismografia</b> (variação da luz refletida/transmitida
+            pela pele a cada pulso). <b>Respiração</b> medida pela <b>análise acústica</b> (envelope do som
+            respiratório, FFT na banda 0,1–0,6&nbsp;Hz). Cada medição passa por um <b>gate de confiabilidade</b>
+            (intensidade do sinal, consistência entre sub-janelas, faixa fisiológica) — o sistema só reporta
+            “alta confiança” quando os critérios são atendidos.
+          </div>
+
+          <div class="aviso">
+            ⚠️ <b>Aviso:</b> este relatório tem fins <b>informativos e de triagem</b>, não constitui
+            diagnóstico médico. Sinais vitais variam com atividade, respiração e relaxamento. Para qualquer
+            questão de saúde, procure um profissional habilitado.
+          </div>
+        </div>
+        <div class="rel-rod">
+          <span>Gerado por <b>Égua.ai Saúde</b> · feito no Brasil 🌿</span>
+          <span class="qr" id="relId"></span>
+        </div>
+      </div>
+      <div class="acao"><button id="btnImp">🖨️ Imprimir / Salvar PDF</button></div>
+    </div>
+  </div>
 
 <script>
 const $ = id => document.getElementById(id);
-const cv = $('cv'), ctx = cv.getContext('2d', { willReadFrequently:true });
-const wave = $('wave'), wctx = wave.getContext('2d');
-const video = $('preview');
-let stream, track, buf = [], curId = null;
-const WIN_MS = 12000;
+const med = { bpm:null, bpmConf:false, bpmWave:[], rpm:null, rpmConf:false, nivel:0 };
 
-async function abrir(deviceId){
-  if (stream) stream.getTracks().forEach(t => t.stop());
-  const c = deviceId ? { video:{ deviceId:{ exact:deviceId } } }
-                     : { video:{ facingMode:{ ideal:'environment' } } };
-  stream = await navigator.mediaDevices.getUserMedia(c);
-  track = stream.getVideoTracks()[0];
-  curId = track.getSettings().deviceId;
-  video.srcObject = stream; await video.play();
-  // tenta ligar o flash (torch) NESTA câmera
-  const caps = track.getCapabilities ? track.getCapabilities() : {};
-  let torch = false;
-  if (caps.torch){ try { await track.applyConstraints({ advanced:[{ torch:true }] }); torch = true; } catch(e){} }
-  $('flash').textContent = caps.torch ? (torch ? '🔦 flash ON' : '🔦 flash falhou') : '🔦 sem flash aqui';
-  $('flash').className = 'badge' + (torch ? ' ok' : '');
-  buf = [];
+/* ---------------- BATIMENTO (camera, finger-PPG) ---------------- */
+const cvB = document.createElement('canvas'); cvB.width=cvB.height=64;
+const cb = cvB.getContext('2d',{willReadFrequently:true});
+const wb = $('wbpm').getContext('2d');
+let streamB, trackB, bufB=[], rafB, curId=null;
+
+async function abrirCam(id){
+  if(streamB) streamB.getTracks().forEach(t=>t.stop());
+  const c = id?{video:{deviceId:{exact:id}}}:{video:{facingMode:{ideal:'environment'}}};
+  streamB = await navigator.mediaDevices.getUserMedia(c);
+  trackB = streamB.getVideoTracks()[0]; curId = trackB.getSettings().deviceId;
+  $('prev').srcObject = streamB; await $('prev').play();
+  const caps = trackB.getCapabilities?trackB.getCapabilities():{}; let torch=false;
+  if(caps.torch){ try{ await trackB.applyConstraints({advanced:[{torch:true}]}); torch=true; }catch(e){} }
+  $('bflash').textContent = caps.torch?(torch?'🔦 flash ON':'🔦 flash falhou'):'🔦 sem flash';
+  $('bflash').className='b'+(torch?' ok':''); bufB=[];
+}
+async function listarCams(){
+  const ds=(await navigator.mediaDevices.enumerateDevices()).filter(d=>d.kind==='videoinput');
+  const s=$('cams'); s.innerHTML=''; ds.forEach((d,i)=>{const o=document.createElement('option');
+    o.value=d.deviceId; o.textContent=d.label||('Câmera '+(i+1)); s.appendChild(o);});
+  s.style.display = ds.length>1?'block':'none'; if(curId) s.value=curId;
+}
+$('cams').addEventListener('change',e=>abrirCam(e.target.value).catch(()=>{}));
+
+function quadroB(){ const v=$('prev'); if(v.readyState<2) return null;
+  cb.drawImage(v,0,0,64,64); const d=cb.getImageData(16,16,32,32).data;
+  let R=0,G=0,B=0,n=0; const L=[]; for(let i=0;i<d.length;i+=4){R+=d[i];G+=d[i+1];B+=d[i+2];L.push((d[i]+d[i+1]+d[i+2])/3);n++;}
+  R/=n;G/=n;B/=n; const m=(R+G+B)/3; let v2=0; L.forEach(x=>v2+=(x-m)**2);
+  return {R, meanL:m, stdL:Math.sqrt(v2/n), redness:R/(R+G+B+1)};
+}
+function loopB(){ const q=quadroB();
+  if(q){ const t=performance.now(); bufB.push({t,r:q.R}); while(bufB.length&&t-bufB[0].t>12000) bufB.shift();
+    const escuro=q.meanL<18, coberto=q.meanL>20&&q.redness>0.42&&q.stdL<38; let ok=false,msg;
+    if(escuro)msg='👆 escuro — troque câmera'; else if(coberto){msg='👆 dedo ✓';ok=true;} else msg='👆 ponha o dedo';
+    $('bdedo').textContent=msg; $('bdedo').className='b'+(ok?' ok':'');
+    desenha(wb,$('wbpm'),bufB.map(b=>b.r));
+    if(ok&&bufB.length>80) calcB(); else $('bpulso').className='b';
+  } rafB=requestAnimationFrame(loopB);
+}
+function calcB(){ const n=bufB.length,t0=bufB[0].t,ts=bufB.map(b=>(b.t-t0)/1000);
+  const mn=bufB.reduce((a,b)=>a+b.r,0)/n,x=bufB.map(b=>b.r-mn); let bf=0,bp=-1,so=0,c=0;
+  for(let f=0.7;f<=3.5;f+=0.02){let re=0,im=0;for(let k=0;k<n;k++){const a=2*Math.PI*f*ts[k];re+=x[k]*Math.cos(a);im-=x[k]*Math.sin(a);}
+    const p=re*re+im*im;so+=p;c++;if(p>bp){bp=p;bf=f;}}
+  const bpm=Math.round(bf*60),snr=bp/(so/c+1e-9),puls=snr>5&&ts[n-1]>6;
+  $('bpulso').textContent=puls?'💓 pulso ✓':'💓 fraco'; $('bpulso').className='b'+(puls?' ok':'');
+  if(puls&&bpm>=45&&bpm<=180){ $('bpm').textContent=bpm; med.bpm=bpm; med.bpmConf=true; med.bpmWave=bufB.map(b=>b.r);
+    $('sbpm').innerHTML='<b style="color:#138a5e">✓ medição confiável</b>'; }
+}
+$('btnBpm').addEventListener('click',async()=>{ $('btnBpm').disabled=true; $('sbpm').textContent='Abrindo câmera...';
+  try{ await abrirCam(null); await listarCams(); $('sbpm').textContent='Cubra a câmera+flash; troque a câmera se precisar.';
+    cancelAnimationFrame(rafB); loopB();
+    setTimeout(()=>{ $('btnBpm').disabled=false; $('btnBpm').textContent='Medir de novo';
+      if(!med.bpmConf) $('sbpm').innerHTML='<b style="color:#c9851f">sinal fraco</b> — cubra melhor / troque a câmera.'; },20000);
+  }catch(e){ $('sbpm').innerHTML='Sem acesso à câmera (precisa HTTPS / permitir).'; $('btnBpm').disabled=false; }
+});
+
+/* ---------------- RESPIRACAO (microfone) ---------------- */
+const POLL=50; // ms -> envelope a 20 Hz
+async function medirResp(seg){
+  $('btnResp').disabled=true; $('srpm').textContent='Abrindo microfone...';
+  let stream;
+  try{ stream=await navigator.mediaDevices.getUserMedia({audio:true}); }
+  catch(e){ $('srpm').textContent='Sem acesso ao microfone (permita o áudio).'; $('btnResp').disabled=false; return; }
+  const AC=window.AudioContext||window.webkitAudioContext; const ac=new AC();
+  const src=ac.createMediaStreamSource(stream); const an=ac.createAnalyser(); an.fftSize=2048; src.connect(an);
+  const tb=new Float32Array(an.fftSize); const env=[]; const t0=performance.now();
+  $('srpm').textContent='Respirando... respire audível perto do mic.';
+  const timer=setInterval(()=>{
+    an.getFloatTimeDomainData(tb); let s=0; for(let i=0;i<tb.length;i++) s+=tb[i]*tb[i];
+    const rms=Math.sqrt(s/tb.length); env.push(rms); med.nivel=rms;
+    $('rbar').style.width=Math.min(100,rms*4000)+'%';
+    $('brnivel').textContent='🎙️ '+(rms>0.004?'captando':'baixo'); $('brnivel').className='b'+(rms>0.004?' ok':'');
+    const el=(performance.now()-t0)/1000;
+    if(el>=seg){ clearInterval(timer); stream.getTracks().forEach(t=>t.stop()); ac.close();
+      const r=analisaResp(env,1000/POLL); $('btnResp').disabled=false; $('btnResp').textContent='Medir de novo';
+      if(r.rpm&&r.conf){ $('rpm').textContent=r.rpm; med.rpm=r.rpm; med.rpmConf=true;
+        $('brconf').textContent='✓ alta'; $('brconf').className='b ok';
+        $('srpm').innerHTML='<b style="color:#138a5e">✓ medição confiável</b>'; }
+      else{ $('rpm').textContent=r.rpm||'--'; med.rpm=r.rpm; med.rpmConf=false;
+        $('brconf').textContent='✗ baixa'; $('brconf').className='b aten';
+        $('srpm').innerHTML='<b style="color:#c9851f">confiança baixa</b> — respire audível, mais perto, ambiente silencioso.'; }
+    }
+  },POLL);
+}
+function analisaResp(env,fps){ const n=env.length; if(n<fps*10) return {rpm:null,conf:false};
+  const mn=env.reduce((a,b)=>a+b,0)/n; const x=env.map(v=>v-mn);
+  let bf=0,bp=-1,so=0,c=0; for(let f=0.1;f<=0.6;f+=0.005){let re=0,im=0;
+    for(let k=0;k<n;k++){const a=2*Math.PI*f*k/fps;re+=x[k]*Math.cos(a);im-=x[k]*Math.sin(a);}
+    const p=re*re+im*im;so+=p;c++;if(p>bp){bp=p;bf=f;}}
+  const rpm=Math.round(bf*60),snr=bp/(so/c+1e-9);
+  return {rpm, snr, conf: snr>4 && rpm>=6 && rpm<=40};
+}
+$('btnResp').addEventListener('click',()=>medirResp(30));
+
+/* ---------------- util ---------------- */
+function desenha(ctx,cv,arr){ ctx.clearRect(0,0,cv.width,cv.height); if(arr.length<4)return;
+  const mn=Math.min(...arr),mx=Math.max(...arr),rg=(mx-mn)||1; ctx.strokeStyle='#0fb39a';ctx.lineWidth=2;ctx.beginPath();
+  arr.forEach((v,i)=>{const x=i/(arr.length-1)*cv.width,y=cv.height-((v-mn)/rg)*(cv.height-6)-3;i?ctx.lineTo(x,y):ctx.moveTo(x,y);});
+  ctx.stroke();
 }
 
-async function listar(){
-  const ds = (await navigator.mediaDevices.enumerateDevices()).filter(d => d.kind === 'videoinput');
-  const sel = $('cams'); sel.innerHTML = '';
-  ds.forEach((d,i) => { const o = document.createElement('option');
-    o.value = d.deviceId; o.textContent = d.label || ('Câmera ' + (i+1)); sel.appendChild(o); });
-  sel.style.display = ds.length > 1 ? '' : 'none';
-  if (curId) sel.value = curId;
-}
+/* ---------------- RELATORIO (Visual Law) ---------------- */
+function statusFC(b){ if(b==null)return['—','',''];
+  if(b<60)return['Bradicardia (repouso)','aten','aten']; if(b>100)return['Taquicardia (repouso)','alto','alto'];
+  return['Normal','ok','ok']; }
+function statusRR(r){ if(r==null)return['—','',''];
+  if(r<12)return['Abaixo do usual','aten','aten']; if(r>20)return['Acima do usual','aten','aten'];
+  return['Normal','ok','ok']; }
 
-async function iniciar(){
-  $('btn').disabled = true; $('status').textContent = 'Abrindo câmera...';
-  try {
-    await abrir(null);
-    await listar();
-    $('status').innerHTML = 'Cubra a câmera + flash com o dedo. Troque a câmera se precisar.';
-    $('btn').textContent = 'Medindo...';
-    requestAnimationFrame(loop);
-  } catch(e){
-    $('status').innerHTML = 'Sem acesso à câmera (este link já é HTTPS — toque em "permitir").';
-    $('btn').disabled = false;
-  }
-}
-$('cams').addEventListener('change', e => abrir(e.target.value).catch(()=>{}));
-
-function quadro(){
-  if (video.readyState < 2) return null;
-  ctx.drawImage(video, 0, 0, 64, 64);
-  const d = ctx.getImageData(16,16,32,32).data;
-  let R=0,G=0,B=0,n=0; const L=[];
-  for (let i=0;i<d.length;i+=4){ R+=d[i]; G+=d[i+1]; B+=d[i+2]; L.push((d[i]+d[i+1]+d[i+2])/3); n++; }
-  R/=n; G/=n; B/=n;
-  const meanL=(R+G+B)/3; let v=0; L.forEach(x=>v+=(x-meanL)**2);
-  return { R, meanL, stdL:Math.sqrt(v/n), redness:R/(R+G+B+1) };
-}
-
-function loop(){
-  const q = quadro();
-  if (q){
-    const t = performance.now();
-    buf.push({ t, r:q.R });
-    while (buf.length && t-buf[0].t > WIN_MS) buf.shift();
-    // DETECCAO DE DEDO: imagem avermelhada + uniforme + nao-preta = dedo cobrindo c/ flash
-    const escuro  = q.meanL < 18;
-    const coberto = q.meanL > 20 && q.redness > 0.42 && q.stdL < 38;
-    let ok = false, msg;
-    if (escuro)       msg = '👆 escuro — flash off? troque câmera';
-    else if (coberto){ msg = '👆 dedo ✓'; ok = true; }
-    else              msg = '👆 ponha o dedo';
-    $('dedo').textContent = msg; $('dedo').className = 'badge' + (ok?' ok':'');
-    desenhar();
-    if (ok && buf.length > 80) calcular(); else $('pulso').className='badge';
-  }
-  requestAnimationFrame(loop);
-}
-
-function desenhar(){
-  wctx.clearRect(0,0,wave.width,wave.height);
-  if (buf.length < 4) return;
-  const rs = buf.map(b=>b.r), mn=Math.min(...rs), mx=Math.max(...rs), rng=(mx-mn)||1;
-  wctx.strokeStyle='#3fb950'; wctx.lineWidth=2; wctx.beginPath();
-  buf.forEach((b,i)=>{ const x=i/(buf.length-1)*wave.width;
-    const y=wave.height-((b.r-mn)/rng)*(wave.height-6)-3; i?wctx.lineTo(x,y):wctx.moveTo(x,y); });
-  wctx.stroke();
-}
-
-function calcular(){
-  const n=buf.length, t0=buf[0].t, ts=buf.map(b=>(b.t-t0)/1000);
-  const mean=buf.reduce((a,b)=>a+b.r,0)/n, x=buf.map(b=>b.r-mean);
-  let bestF=0,bestP=-1,soma=0,c=0;
-  for (let f=0.7; f<=3.5; f+=0.02){
-    let re=0,im=0; for (let k=0;k<n;k++){ const a=2*Math.PI*f*ts[k]; re+=x[k]*Math.cos(a); im-=x[k]*Math.sin(a); }
-    const p=re*re+im*im; soma+=p; c++; if (p>bestP){ bestP=p; bestF=f; }
-  }
-  const bpm=Math.round(bestF*60), snr=bestP/(soma/c+1e-9), dur=ts[n-1];
-  const pulsando = snr>5 && dur>6;
-  $('pulso').textContent = pulsando ? '💓 pulso ✓' : '💓 fraco';
-  $('pulso').className = 'badge' + (pulsando?' ok':'');
-  if (pulsando && bpm>=45 && bpm<=180){
-    $('bpm').innerHTML = bpm + '<small> BPM</small>';
-    $('status').innerHTML = '<span class="ok">✓ CÂMERA CORRETA · CONFIABILIDADE ALTA</span><br>valide o rppg.py contra este número';
-  } else {
-    $('status').innerHTML = '<span class="alerta">Ajuste o dedo ou troque a câmera no seletor</span> até "dedo ✓" + "pulso ✓".';
-  }
-}
-$('btn').addEventListener('click', iniciar);
+$('btnRel').addEventListener('click',()=>{
+  if(med.bpm==null && med.rpm==null){ alert('Meça ao menos um sinal vital primeiro (batimento ou respiração).'); return; }
+  const dt=new Date(); const dd=dt.toLocaleDateString('pt-BR'), hh=dt.toLocaleTimeString('pt-BR').slice(0,5);
+  const id='EAS-'+dt.getTime().toString(36).toUpperCase().slice(-8);
+  $('relMeta').innerHTML='Data: '+dd+'<br>Hora: '+hh+'<br>Protocolo: '+id;
+  $('relId').textContent=id;
+  const [fc,fcc]=statusFC(med.bpm), [rr,rrc]=statusRR(med.rpm);
+  const cardFC = med.bpm!=null ? `
+    <div class="vital ${med.bpmConf?fcc:'aten'}">
+      <div class="nome">🫀 Frequência cardíaca</div>
+      <div class="n">${med.bpm}<small> bpm</small></div>
+      <span class="pill ${med.bpmConf?fcc:'aten'}">${med.bpmConf?fc:'Confiança baixa'}</span>
+      <div class="ref">Referência repouso: 60–100 bpm · método: fotopletismografia</div>
+    </div>` : '';
+  const cardRR = med.rpm!=null ? `
+    <div class="vital ${med.rpmConf?rrc:'aten'}">
+      <div class="nome">🫁 Frequência respiratória</div>
+      <div class="n">${med.rpm}<small> rpm</small></div>
+      <span class="pill ${med.rpmConf?rrc:'aten'}">${med.rpmConf?rr:'Confiança baixa'}</span>
+      <div class="ref">Referência repouso: 12–20 rpm · método: análise acústica</div>
+    </div>` : '';
+  $('relVitais').innerHTML = cardFC + cardRR;
+  $('relatorio').style.display='block';
+  $('relatorio').scrollIntoView({behavior:'smooth'});
+});
+$('btnImp').addEventListener('click',()=>window.print());
 </script>
 </body>
 </html>
